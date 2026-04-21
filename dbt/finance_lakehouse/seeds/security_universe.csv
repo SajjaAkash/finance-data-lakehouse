@@ -1,0 +1,4 @@
+ticker,company_name,sector,is_active,primary_exchange,asset_class,country_code,currency_code,listing_status,security_type,issuer_category,region,industry_group
+AAPL,Apple Inc,Information Technology,true,NASDAQ,Equity,US,USD,listed,Common Stock,Operating Company,North America,Technology Hardware
+MSFT,Microsoft Corp,Information Technology,true,NASDAQ,Equity,US,USD,listed,Common Stock,Operating Company,North America,Software
+NVDA,NVIDIA Corp,Information Technology,true,NASDAQ,Equity,US,USD,listed,Common Stock,Operating Company,North America,Semiconductors

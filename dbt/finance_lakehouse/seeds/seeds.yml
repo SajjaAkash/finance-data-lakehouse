@@ -1,0 +1,66 @@
+version: 2
+
+seeds:
+  - name: security_universe
+    description: Canonical tracked security universe.
+    columns:
+      - name: ticker
+        tests:
+          - not_null
+          - unique
+      - name: company_name
+        tests:
+          - not_null
+      - name: sector
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Information Technology']
+      - name: is_active
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['true']
+      - name: primary_exchange
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['NASDAQ']
+      - name: asset_class
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Equity']
+      - name: country_code
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['US']
+      - name: currency_code
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['USD']
+      - name: listing_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['listed']
+      - name: security_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Common Stock']
+      - name: issuer_category
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Operating Company']
+      - name: region
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['North America']
+      - name: industry_group
+        tests:
+          - not_null
