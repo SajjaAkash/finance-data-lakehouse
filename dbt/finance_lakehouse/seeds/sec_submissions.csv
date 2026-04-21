@@ -1,0 +1,4 @@
+cik,ticker,filing_url,source_system,extracted_at
+0000320193,AAPL,https://www.sec.gov/Archives/edgar/data/320193/aapl-10q.htm,sec_submissions,2026-04-20T20:15:00
+0000789019,MSFT,https://www.sec.gov/Archives/edgar/data/789019/msft-10q.htm,sec_submissions,2026-04-20T20:18:00
+0001045810,NVDA,https://www.sec.gov/Archives/edgar/data/1045810/nvda-10q.htm,sec_submissions,2026-04-20T20:20:00

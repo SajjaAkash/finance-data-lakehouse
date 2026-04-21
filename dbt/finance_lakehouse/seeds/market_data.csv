@@ -1,0 +1,4 @@
+symbol,close_price,trade_volume,source_system,extracted_at
+AAPL,189.32,51234000,market_api,2026-04-20T21:00:00
+MSFT,412.15,28420000,market_api,2026-04-20T21:00:00
+NVDA,1024.44,39870000,market_api,2026-04-20T21:00:00
