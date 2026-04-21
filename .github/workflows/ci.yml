@@ -18,7 +18,7 @@ jobs:
       - name: Ruff
         run: ruff check .
       - name: Pytest
-        run: pytest
+        run: pytest --cov=finance_lakehouse --cov-report=term-missing
 
   dbt-structure:
     runs-on: ubuntu-latest
@@ -28,3 +28,11 @@ jobs:
         run: |
           test -f dbt/finance_lakehouse/dbt_project.yml
           test -f dbt/finance_lakehouse/models/schema.yml
+
+  terraform-structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform fmt check
+        run: terraform -chdir=infrastructure/terraform fmt -check

@@ -3,19 +3,35 @@ from __future__ import annotations
 from datetime import datetime
 
 from airflow import DAG
+from airflow.models.baseoperator import chain
+from airflow.operators.bash import BashOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
+from airflow.utils.task_group import TaskGroup
 
-from finance_lakehouse.jobs.glue_market_bronze import render_manifest as render_market_manifest
-from finance_lakehouse.jobs.glue_sec_bronze import render_manifest as render_sec_manifest
+from finance_lakehouse.config import settings
+from finance_lakehouse.jobs.glue_market_bronze import run_job as market_bronze_preview
+from finance_lakehouse.jobs.glue_sec_bronze import run_job as sec_bronze_preview
+
+AWS_CONN_ID = "aws_default"
+DBT_PROJECT_DIR = "/usr/local/airflow/dags/dbt/finance_lakehouse"
+DBT_PROFILES_DIR = "/usr/local/airflow/dags/dbt/finance_lakehouse"
+MARKET_BRONZE_JOB_EXPR = (
+    "{{ var.value.finance_market_bronze_job | default('finance-market-bronze') }}"
+)
+SEC_BRONZE_JOB_EXPR = "{{ var.value.finance_sec_bronze_job | default('finance-sec-bronze') }}"
+MARKET_SILVER_JOB_EXPR = (
+    "{{ var.value.finance_market_silver_job | default('finance-market-silver') }}"
+)
+SEC_SILVER_JOB_EXPR = "{{ var.value.finance_sec_silver_job | default('finance-sec-silver') }}"
 
 
-def log_market_manifest() -> None:
-    print(render_market_manifest(["AAPL", "MSFT", "NVDA"]))
+def preview_market_job() -> None:
+    print(market_bronze_preview([]))
 
 
-def log_sec_manifest() -> None:
-    print(render_sec_manifest(["320193", "789019", "1045810"], ["AAPL", "MSFT", "NVDA"]))
+def preview_sec_job() -> None:
+    print(sec_bronze_preview([]))
 
 
 with DAG(
@@ -23,28 +39,106 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     schedule="@daily",
     catchup=False,
-    tags=["finance", "lakehouse", "mwaa"],
+    max_active_runs=1,
+    default_args={
+        "owner": "data-platform",
+        "retries": 2,
+    },
+    tags=["finance", "lakehouse", "mwaa", "dbt", "glue"],
+    description="Bronze to Gold finance lakehouse pipeline orchestrated in MWAA.",
 ) as dag:
     start = EmptyOperator(task_id="start")
 
-    ingest_market_data = PythonOperator(
-        task_id="ingest_market_data",
-        python_callable=log_market_manifest,
+    with TaskGroup(group_id="bronze_ingestion") as bronze_ingestion:
+        preview_market = PythonOperator(
+            task_id="preview_market_glue_payload",
+            python_callable=preview_market_job,
+        )
+        preview_sec = PythonOperator(
+            task_id="preview_sec_glue_payload",
+            python_callable=preview_sec_job,
+        )
+
+        submit_market_glue_job = BashOperator(
+            task_id="submit_market_glue_job",
+            bash_command=(
+                "echo aws glue start-job-run "
+                f"--job-name {MARKET_BRONZE_JOB_EXPR} "
+                "--arguments '--execution_date={{ ds }}T00:00:00Z,--raw_bucket="
+                + settings.aws.raw_bucket
+                + "'"
+            ),
+        )
+
+        submit_sec_glue_job = BashOperator(
+            task_id="submit_sec_glue_job",
+            bash_command=(
+                "echo aws glue start-job-run "
+                f"--job-name {SEC_BRONZE_JOB_EXPR} "
+                "--arguments '--execution_date={{ ds }}T00:00:00Z,--raw_bucket="
+                + settings.aws.raw_bucket
+                + "'"
+            ),
+        )
+
+        chain(preview_market, submit_market_glue_job)
+        chain(preview_sec, submit_sec_glue_job)
+
+    with TaskGroup(group_id="silver_processing") as silver_processing:
+        submit_market_silver_glue_job = BashOperator(
+            task_id="submit_market_silver_glue_job",
+            bash_command=(
+                "echo aws glue start-job-run "
+                f"--job-name {MARKET_SILVER_JOB_EXPR} "
+                "--arguments '--execution_date={{ ds }}T00:00:00Z,--processed_bucket="
+                + settings.aws.processed_bucket
+                + "'"
+            ),
+        )
+
+        submit_sec_silver_glue_job = BashOperator(
+            task_id="submit_sec_silver_glue_job",
+            bash_command=(
+                "echo aws glue start-job-run "
+                f"--job-name {SEC_SILVER_JOB_EXPR} "
+                "--arguments '--execution_date={{ ds }}T00:00:00Z,--processed_bucket="
+                + settings.aws.processed_bucket
+                + "'"
+            ),
+        )
+
+    run_dbt_seed = BashOperator(
+        task_id="run_dbt_seed",
+        bash_command=(
+            f"cd {DBT_PROJECT_DIR} && "
+            f"dbt seed --profiles-dir {DBT_PROFILES_DIR} --target {settings.platform.dbt_target}"
+        ),
     )
 
-    ingest_sec_submissions = PythonOperator(
-        task_id="ingest_sec_submissions",
-        python_callable=log_sec_manifest,
+    run_dbt_build = BashOperator(
+        task_id="run_dbt_build",
+        bash_command=(
+            f"cd {DBT_PROJECT_DIR} && "
+            f"dbt build --profiles-dir {DBT_PROFILES_DIR} --target {settings.platform.dbt_target}"
+        ),
     )
 
-    run_silver_processing = EmptyOperator(task_id="run_silver_processing")
-    run_dbt_gold_models = EmptyOperator(task_id="run_dbt_gold_models")
+    publish_summary = BashOperator(
+        task_id="publish_summary",
+        bash_command=(
+            "echo Pipeline completed for {{ ds }} "
+            f"using AWS connection {AWS_CONN_ID} in environment {settings.platform.environment}"
+        ),
+    )
+
     end = EmptyOperator(task_id="end")
 
-    (
-        start
-        >> [ingest_market_data, ingest_sec_submissions]
-        >> run_silver_processing
-        >> run_dbt_gold_models
-        >> end
+    chain(
+        start,
+        bronze_ingestion,
+        silver_processing,
+        run_dbt_seed,
+        run_dbt_build,
+        publish_summary,
+        end,
     )

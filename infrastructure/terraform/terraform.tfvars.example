@@ -1,0 +1,12 @@
+aws_region            = "us-east-1"
+project_name          = "finance-lakehouse"
+environment           = "dev"
+glue_database_name    = "finance_lakehouse"
+vpc_id                = "vpc-xxxxxxxx"
+private_subnet_ids    = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"]
+mwaa_environment_name = "finance-lakehouse-mwaa"
+
+tags = {
+  Owner   = "data-platform"
+  Project = "finance-data-lakehouse"
+}

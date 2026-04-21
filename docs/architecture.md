@@ -1,22 +1,43 @@
 # Architecture Notes
 
-## Data Flow
+## End-to-End Data Flow
 
-1. Source extracts land in Bronze S3 paths partitioned by ingestion date.
-2. Glue transforms normalize raw payloads into conformed Silver records stored as Delta-formatted tables.
-3. dbt builds analytics-ready Gold marts from curated upstream datasets.
-4. Airflow orchestrates the dependency graph and provides operational observability.
+1. Market data and SEC submission metadata land in Bronze S3 prefixes partitioned by ingestion date.
+2. Glue PySpark Bronze jobs standardize raw payload shapes and register downstream table locations.
+3. Glue PySpark Silver jobs apply normalization, deduplication, and Delta Lake merge semantics.
+4. dbt models transform curated Silver datasets into analytics-ready Gold marts.
+5. MWAA orchestrates ingestion, Silver processing, dbt seed, dbt build, and summary publication.
 
-## Core Design Choices
+## Medallion Layering
 
-- Medallion layering keeps raw ingestion isolated from business logic.
-- dbt owns semantic transformations and tests.
-- Glue is reserved for scalable extract and standardization work.
-- Airflow coordinates cross-system dependencies instead of embedding orchestration inside jobs.
+### Bronze
 
-## Next Enhancements
+- Immutable, ingestion-date-partitioned landing paths in S3.
+- Market dataset and SEC submissions dataset tracked independently.
+- Write mode optimized for append-only raw extracts.
 
-- Replace manifest stubs with real API and SEC fetch clients.
-- Add Delta table registration in Glue Catalog or Lake Formation.
-- Parameterize Airflow tasks to trigger true Glue jobs and dbt execution.
-- Add warehouse-specific dbt target profiles for production.
+### Silver
+
+- Conformed Delta Lake datasets for `market_data` and `sec_submissions`.
+- Merge keys defined explicitly for idempotent upserts.
+- Table registration SQL and write options captured in code for deployment parity.
+
+### Gold
+
+- `gold_security_master` provides analytics-ready security coverage state.
+- `gold_security_coverage_summary` aggregates sector and region coverage metrics.
+- dbt tests provide a strong semantic validation layer over curated outputs.
+
+## Operational Components
+
+- `Glue`: scalable ingestion and curation workloads.
+- `MWAA`: orchestration and operational scheduling.
+- `Terraform`: reproducible platform provisioning.
+- `GitHub Actions`: repository-level CI guardrails.
+
+## Design Choices
+
+- Business semantics live in dbt instead of being embedded in Glue jobs.
+- Glue jobs own extract, conformance, and Delta-oriented persistence behavior.
+- Airflow coordinates across systems rather than holding heavy transformation logic.
+- Terraform manages platform resources so the repo is reviewable as a full-stack data platform project.

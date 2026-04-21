@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from finance_lakehouse.jobs.common import deduplicate_records, normalize_ticker
+from finance_lakehouse.jobs.common import deduplicate_records, normalize_cik, normalize_ticker
 
 
 def curate_market_records(records: Iterable[dict]) -> list[dict]:
@@ -29,13 +29,24 @@ def curate_market_records(records: Iterable[dict]) -> list[dict]:
 
 
 def curate_sec_records(records: Iterable[dict]) -> list[dict]:
+    normalized_records = [
+        {
+            **record,
+            "ticker": normalize_ticker(record["ticker"]),
+            "cik": normalize_cik(record["cik"]),
+        }
+        for record in records
+    ]
+
     curated: list[dict] = []
-    for record in deduplicate_records(records, key="filing_url"):
+    for record in deduplicate_records(normalized_records, key="filing_url"):
         curated.append(
             {
-                "cik": str(record["cik"]).zfill(10),
-                "ticker": normalize_ticker(record["ticker"]),
+                "cik": record["cik"],
+                "ticker": record["ticker"],
                 "filing_url": record["filing_url"],
+                "form_type": record.get("form_type"),
+                "filing_date": record.get("filing_date"),
                 "source_system": record.get("source_system", "sec_submissions"),
                 "extracted_at": record.get("extracted_at"),
             }

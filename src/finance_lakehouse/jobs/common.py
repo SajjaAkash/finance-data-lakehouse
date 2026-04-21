@@ -36,3 +36,21 @@ def deduplicate_records(records: Iterable[dict], key: str) -> list[dict]:
         unique.append(record)
 
     return unique
+
+
+def normalize_cik(value: str) -> str:
+    return str(value).strip().zfill(10)
+
+
+def iso_date(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%d")
+
+
+def iso_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def chunked(values: list[str], size: int) -> list[list[str]]:
+    if size <= 0:
+        raise ValueError("size must be positive")
+    return [values[index : index + size] for index in range(0, len(values), size)]
